@@ -8,5 +8,7 @@ router.get('/:id', playerService.getPlayer)
 router.patch('/:id/region', playerService.setRegion)
 router.post('/:id/starter', playerService.chooseStarter)
 router.patch('/:id/move', playerService.movePlayer)
+router.put('/:id', playerService.updatePlayer)
+
 
 export default router
