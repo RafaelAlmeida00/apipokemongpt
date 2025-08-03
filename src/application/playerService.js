@@ -7,7 +7,13 @@ export default {
   async createPlayer(req, res) {
     const data = req.body
     const player = new Player(data)
-    const result = await sql`INSERT INTO players ${sql(player)} RETURNING *`
+
+// Remove campos com undefined
+const sanitized = Object.fromEntries(
+  Object.entries(player).filter(([_, v]) => v !== undefined)
+)
+
+const result = await sql`INSERT INTO players ${sql(sanitized)} RETURNING *`
     res.json(result[0])
   },
 
