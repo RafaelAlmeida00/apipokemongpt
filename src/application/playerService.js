@@ -32,5 +32,20 @@ export default {
     const { novaLocalizacao } = req.body
     await sql`UPDATE players SET localizacao = ${novaLocalizacao} WHERE id = ${req.params.id}`
     res.sendStatus(200)
+  },
+    async updatePlayer(req, res) {
+    const { id } = req.params
+    const updates = req.body
+
+    try {
+      const keys = Object.keys(updates)
+      for (const key of keys) {
+        await sql`UPDATE players SET ${sql(key)} = ${updates[key]} WHERE id = ${id}`
+      }
+      res.status(200).json({ message: 'Jogador atualizado com sucesso' })
+    } catch (err) {
+      res.status(500).json({ error: 'Erro ao atualizar jogador', details: err.message })
+    }
   }
+
 } 
