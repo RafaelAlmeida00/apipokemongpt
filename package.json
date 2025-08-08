@@ -1,0 +1,15 @@
+{
+  "name": "pokemon-rpg-api",
+  "type": "module",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "postgres": "^3.3.5"
+  }
+}
