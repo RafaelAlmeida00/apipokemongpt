@@ -20,24 +20,49 @@ export default {
     }
   },
 
-  async addItem(req, res) {
-    // Adiciona um item ao inventário.  O corpo deve conter pelo menos
-    // `nome` e opcionalmente `quantidade` e outras informações.  Um
-    // identificador único é gerado para permitir atualizações
-    // subsequentes.
-    const { nome, quantidade = 1, notas } = req.body || {}
-    if (!nome) return res.status(400).json({ error: 'Nome do item é obrigatório' })
-    const item = { id: Date.now().toString(), nome, quantidade, notas }
-    try {
-      const result = await sql`SELECT itens FROM players WHERE id = ${req.params.id}`
-      const itens = result[0]?.itens || []
-      itens.push(item)
-      await sql`UPDATE players SET itens = ${sql.json(itens)} WHERE id = ${req.params.id}`
-      res.status(201).json(item)
-    } catch (err) {
-      res.status(500).json({ error: 'Erro ao adicionar item', details: err.message })
+ async addItem(req, res) {
+  // Adiciona um item ao inventário.  
+  // O corpo deve conter pelo menos `nome` e opcionalmente `quantidade` e `notas`.
+  // Um identificador único é gerado para permitir atualizações subsequentes.
+
+  const { nome, quantidade = 1, notas } = req.body || {};
+
+  if (!nome) {
+    return res.status(400).json({ error: 'Nome do item é obrigatório' });
+  }
+
+  const item = { id: Date.now().toString(), nome, quantidade, notas };
+
+  try {
+    // Busca os itens existentes
+    const result = await sql`
+      SELECT itens 
+      FROM players 
+      WHERE id = ${req.params.id}
+    `;
+
+    // Garante que 'itens' seja sempre um array
+    let itensFromDB = result[0]?.itens;
+    if (!Array.isArray(itensFromDB)) {
+      itensFromDB = itensFromDB ? [itensFromDB] : [];
     }
-  },
+
+    // Adiciona o novo item
+    itensFromDB.push(item);
+
+    // Atualiza no banco como jsonb[]
+    await sql`
+      UPDATE players 
+      SET itens = ${sql.array(itensFromDB.map(i => sql.json(i)), 'jsonb')} 
+      WHERE id = ${req.params.id}
+    `;
+
+    res.status(201).json(item);
+
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao adicionar item', details: err.message });
+  }
+},
 
   async updateItem(req, res) {
     // Atualiza campos de um item específico do inventário.
