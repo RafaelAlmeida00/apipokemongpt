@@ -20,7 +20,7 @@ export default {
     }
   },
 
-async function addItem(req, res) {
+async addItem(req, res) {
   const { nome, quantidade = 1, notas } = req.body || {};
   if (!nome) {
     return res.status(400).json({ error: 'Nome do item é obrigatório' });
