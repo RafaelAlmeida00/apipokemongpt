@@ -43,18 +43,23 @@ async addItem(req, res) {
     `;
 
     let itensFromDB = result[0]?.itens;
+
+    // Garante array e remove objetos vazios
     if (!Array.isArray(itensFromDB)) {
       itensFromDB = itensFromDB ? [itensFromDB] : [];
     }
+    itensFromDB = itensFromDB.filter(
+      i => i && Object.keys(i).length > 0
+    );
 
     // Adiciona o novo item
     itensFromDB.push(item);
 
-    // Salva no banco como jsonb[]
+    // Salva como jsonb[]
     await sql`
       UPDATE players
       SET itens = ${sql.array(
-        itensFromDB.map(i => JSON.stringify(i)), // <-- converte cada item em string JSON
+        itensFromDB.map(i => JSON.stringify(i)),
         'jsonb'
       )}
       WHERE id = ${req.params.id}
