@@ -4,23 +4,24 @@ import axios from 'axios';
 
 export default {
   async listItems(req, res) {
-    // Lista os itens no inventário do jogador. Se o parâmetro `nome`
-    // for fornecido na query, delega a busca à PokeAPI para retornar
-    // os detalhes do item.
+    // Lista os itens no inventário do jogador. Se o parâmetro
+    // `nome` for fornecido na query, delega a busca à PokeAPI para
+    // retornar os detalhes do item.
     try {
       const [player] = await sql`
         SELECT itens
         FROM players
         WHERE id = ${req.params.id}
       `;
-      // Garante que sempre temos um array
+      // Garante que sempre temos um array. Dependendo da versão do driver,
+      // valores jsonb[] antigos podem ser strings; desserializamos se preciso.
       let itens = player?.itens ?? [];
       if (!Array.isArray(itens)) itens = [itens];
-      // Desserializa caso existam strings antigas no array
       itens = itens.map((it) =>
         typeof it === 'string' ? JSON.parse(it) : it
       );
 
+      // Se o usuário informou ?nome=xxx, delegamos à PokeAPI os detalhes do item
       if (req.query.nome) {
         const poke = await axios.get(
           `https://pokeapi.co/api/v2/item/${req.query.nome}`
@@ -89,24 +90,35 @@ export default {
         FROM players
         WHERE id = ${id}
       `;
+      // Garante array e desserializa strings antigas
       let itens = player?.itens ?? [];
       if (!Array.isArray(itens)) itens = [itens];
+      itens = itens.map((it) =>
+        typeof it === 'string' ? JSON.parse(it) : it
+      );
 
       const idx = itens.findIndex((i) => i.id == itemId);
       if (idx < 0) {
-        return res
-          .status(404)
-          .json({ error: 'Item não encontrado' });
+        return res.status(404).json({ error: 'Item não encontrado' });
       }
 
-      // Aplica o patch
+      // Aplica o patch localmente
       itens[idx] = { ...itens[idx], ...patch };
 
-      // Serializa cada item e grava como jsonb[]
-      const valores = itens.map((item) => JSON.stringify(item));
+      // Constrói um literal de array de jsonb[] manualmente. Cada elemento
+      // precisa ser uma string JSON com aspas escapadas.
+      const arrLiteral =
+        '{' +
+        itens
+          .map((item) =>
+            '"' + JSON.stringify(item).replace(/"/g, '\\"') + '"'
+          )
+          .join(',') +
+        '}';
+
       await sql`
         UPDATE players
-        SET itens = ${sql.array(valores, 'jsonb')}
+        SET itens = ${arrLiteral}::jsonb[]
         WHERE id = ${id}
       `;
 
@@ -130,20 +142,29 @@ export default {
       `;
       let itens = player?.itens ?? [];
       if (!Array.isArray(itens)) itens = [itens];
+      itens = itens.map((it) =>
+        typeof it === 'string' ? JSON.parse(it) : it
+      );
 
       const idx = itens.findIndex((i) => i.id == itemId);
       if (idx < 0) {
-        return res
-          .status(404)
-          .json({ error: 'Item não encontrado' });
+        return res.status(404).json({ error: 'Item não encontrado' });
       }
 
       itens.splice(idx, 1);
 
-      const valores = itens.map((item) => JSON.stringify(item));
+      const arrLiteral =
+        '{' +
+        itens
+          .map((item) =>
+            '"' + JSON.stringify(item).replace(/"/g, '\\"') + '"'
+          )
+          .join(',') +
+        '}';
+
       await sql`
         UPDATE players
-        SET itens = ${sql.array(valores, 'jsonb')}
+        SET itens = ${arrLiteral}::jsonb[]
         WHERE id = ${id}
       `;
 
@@ -174,6 +195,9 @@ export default {
       `;
       let itens = player?.itens ?? [];
       if (!Array.isArray(itens)) itens = [itens];
+      itens = itens.map((it) =>
+        typeof it === 'string' ? JSON.parse(it) : it
+      );
 
       const idx = itens.findIndex((i) => i.nome === nome);
       if (idx < 0) {
@@ -188,10 +212,18 @@ export default {
         itens.splice(idx, 1);
       }
 
-      const valores = itens.map((item) => JSON.stringify(item));
+      const arrLiteral =
+        '{' +
+        itens
+          .map((item) =>
+            '"' + JSON.stringify(item).replace(/"/g, '\\"') + '"'
+          )
+          .join(',') +
+        '}';
+
       await sql`
         UPDATE players
-        SET itens = ${sql.array(valores, 'jsonb')}
+        SET itens = ${arrLiteral}::jsonb[]
         WHERE id = ${id}
       `;
 
