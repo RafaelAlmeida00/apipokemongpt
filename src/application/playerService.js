@@ -77,10 +77,8 @@ export default {
  async updatePlayer(req, res) {
   const { id } = req.params;
 
-  // Constrói o patch a partir da query string
-  // Reconhece campos simples e converte numéricos.
-  const patch = {};
-  [
+  // Campos simples que aceitamos via query
+  const simpleFields = [
     'nome',
     'aparencia',
     'personalidade',
@@ -89,43 +87,58 @@ export default {
     'inicial',
     'dinheiro',
     'reputacao'
-  ].forEach((key) => {
+  ];
+
+  // Constrói o patch a partir da query string e converte numéricos
+  const patch = {};
+  simpleFields.forEach((key) => {
     if (req.query[key] !== undefined) {
-      let valor = req.query[key];
+      let val = req.query[key];
       if (['idade', 'dinheiro', 'reputacao'].includes(key)) {
-        valor = Number(valor);
+        val = Number(val);
       }
-      patch[key] = valor;
+      patch[key] = val;
     }
   });
 
-  // O corpo JSON tem prioridade sobre a query
+  // O corpo JSON, se existir, sobrepõe os valores da query
   Object.assign(patch, req.body || {});
 
-  // Campos que armazenam arrays jsonb[] e têm handlers próprios
-  const arrayFields = [
+  // Arrays de texto que também podem vir por query ou body
+  const arrayUpdates = {};
+  ['insignias', 'torneios_participados', 'torneios_ganhos'].forEach((field) => {
+    if (req.query[field] !== undefined) {
+      // Split por vírgula e remove espaços extras
+      // (Express já decodifica + e %20 em espaços)
+      arrayUpdates[field] = req.query[field]
+        .split(',')
+        .map((s) => s.trim());
+    } else if (req.body && Array.isArray(req.body[field])) {
+      arrayUpdates[field] = req.body[field];
+    }
+  });
+
+  // Campos jsonb[] que têm handlers específicos (eventos, amigos, etc.)
+  const jsonbArrayFields = [
     'eventos_iconicos',
     'amigos',
     'inimigos',
     'rivais',
     'interesses',
-    'conhecidos',
-    'insignias',
-    'torneios_participados',
-    'torneios_ganhos'
+    'conhecidos'
   ];
 
   try {
-    const keys = Object.keys(patch);
-    for (const key of keys) {
-      // não mexe em campos tratados por endpoints específicos
-      if (arrayFields.includes(key)) {
+    // Atualiza campos simples (ignorando jsonb[] e arrays de texto)
+    for (const key of Object.keys(patch)) {
+      if (
+        jsonbArrayFields.includes(key) ||
+        ['insignias', 'torneios_participados', 'torneios_ganhos'].includes(key)
+      ) {
         continue;
       }
-
       const value = patch[key];
       if (value && typeof value === 'object') {
-        // para objetos (como localizacao_atual) use json()
         await sql`
           UPDATE players
           SET ${sql(key)} = ${sql.json(value)}
@@ -139,6 +152,24 @@ export default {
         `;
       }
     }
+
+    // Atualiza arrays de texto (insignias e torneios) se presentes
+    for (const field of Object.keys(arrayUpdates)) {
+      const values = arrayUpdates[field];
+      // Constrói literal para text[] — cada valor entre aspas
+      const arrLiteral =
+        '{' +
+        values
+          .map((item) => '"' + item.replace(/"/g, '\\"') + '"')
+          .join(',') +
+        '}';
+      await sql`
+        UPDATE players
+        SET ${sql(field)} = ${arrLiteral}::text[]
+        WHERE id = ${id}
+      `;
+    }
+
     res.status(200).json({ message: 'Jogador atualizado com sucesso' });
   } catch (err) {
     res.status(500).json({
