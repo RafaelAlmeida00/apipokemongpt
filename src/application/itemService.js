@@ -48,9 +48,7 @@ async addItem(req, res) {
     if (!Array.isArray(itensFromDB)) {
       itensFromDB = itensFromDB ? [itensFromDB] : [];
     }
-    itensFromDB = itensFromDB.filter(
-      i => i && Object.keys(i).length > 0
-    );
+    itensFromDB = itensFromDB.filter(i => i && Object.keys(i).length > 0);
 
     // Adiciona o novo item
     itensFromDB.push(item);
@@ -59,7 +57,7 @@ async addItem(req, res) {
     await sql`
       UPDATE players
       SET itens = ${sql.array(
-        itensFromDB.map(i => JSON.stringify(i)),
+        itensFromDB.map(i => sql.json(i)),
         'jsonb'
       )}
       WHERE id = ${req.params.id}
