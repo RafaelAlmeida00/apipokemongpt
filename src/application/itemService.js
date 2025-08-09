@@ -20,14 +20,13 @@ export default {
     }
   },
 
-async addItem(req, res) {
+async function addItem(req, res) {
   const { nome, quantidade = 1, notas } = req.body || {};
-
   if (!nome) {
     return res.status(400).json({ error: 'Nome do item é obrigatório' });
   }
 
-  const item = {
+  const newItem = {
     id: Date.now().toString(),
     nome,
     quantidade,
@@ -35,36 +34,27 @@ async addItem(req, res) {
   };
 
   try {
-    // Busca itens existentes
-    const result = await sql`
+    const [player] = await sql`
       SELECT itens
       FROM players
       WHERE id = ${req.params.id}
     `;
 
-    let itensFromDB = result[0]?.itens;
+    // Garante que sempre temos um array
+    let itens = player?.itens ?? [];
+    if (!Array.isArray(itens)) itens = [itens];
 
-    // Garante array e remove objetos vazios
-    if (!Array.isArray(itensFromDB)) {
-      itensFromDB = itensFromDB ? [itensFromDB] : [];
-    }
-    itensFromDB = itensFromDB.filter(i => i && Object.keys(i).length > 0);
-
-    // Adiciona o novo item
-    itensFromDB.push(item);
-
-    // Salva como jsonb[]
+    // adiciona usando array_append e cast para jsonb
     await sql`
       UPDATE players
-      SET itens = ${sql.array(
-        itensFromDB.map(i => sql.json(i)),
-        'jsonb'
-      )}
+      SET itens = array_append(
+        COALESCE(itens, '{}'::jsonb[]),
+        ${JSON.stringify(newItem)}::jsonb
+      )
       WHERE id = ${req.params.id}
     `;
 
-    res.status(201).json(item);
-
+    res.status(201).json(newItem);
   } catch (err) {
     res.status(500).json({
       error: 'Erro ao adicionar item',
