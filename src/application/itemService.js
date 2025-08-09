@@ -81,55 +81,69 @@ export default {
   },
 
   async updateItem(req, res) {
-    // Atualiza campos de um item específico do inventário.
-    const { id, itemId } = req.params;
-    const patch = req.body || {};
-    try {
-      const [player] = await sql`
-        SELECT itens
-        FROM players
-        WHERE id = ${id}
-      `;
-      // Garante array e desserializa strings antigas
-      let itens = player?.itens ?? [];
-      if (!Array.isArray(itens)) itens = [itens];
-      itens = itens.map((it) =>
-        typeof it === 'string' ? JSON.parse(it) : it
-      );
+  // Atualiza campos de um item específico do inventário.
+  const { id, itemId } = req.params;
 
-      const idx = itens.findIndex((i) => i.id == itemId);
-      if (idx < 0) {
-        return res.status(404).json({ error: 'Item não encontrado' });
-      }
-
-      // Aplica o patch localmente
-      itens[idx] = { ...itens[idx], ...patch };
-
-      // Constrói um literal de array de jsonb[] manualmente. Cada elemento
-      // precisa ser uma string JSON com aspas escapadas.
-      const arrLiteral =
-        '{' +
-        itens
-          .map((item) =>
-            '"' + JSON.stringify(item).replace(/"/g, '\\"') + '"'
-          )
-          .join(',') +
-        '}';
-
-      await sql`
-        UPDATE players
-        SET itens = ${arrLiteral}::jsonb[]
-        WHERE id = ${id}
-      `;
-
-      res.json(itens[idx]);
-    } catch (err) {
-      res.status(500).json({
-        error: 'Erro ao atualizar item',
-        details: err.message
-      });
+  // Constrói o patch a partir do corpo ou query. Se o mesmo campo
+  // existir em ambos, o valor de req.body prevalece.
+  const patch = {};
+  // Copia chaves reconhecidas da query string
+  ['nome', 'quantidade', 'notas'].forEach((key) => {
+    if (req.query[key] !== undefined) {
+      patch[key] = key === 'quantidade'
+        ? Number(req.query[key])
+        : req.query[key];
     }
-  },
+  });
+  // Sobrepõe com valores do corpo, se existirem
+  Object.assign(patch, req.body || {});
+
+  try {
+    const [player] = await sql`
+      SELECT itens
+      FROM players
+      WHERE id = ${id}
+    `;
+    // Garante array e desserializa strings antigas
+    let itens = player?.itens ?? [];
+    if (!Array.isArray(itens)) itens = [itens];
+    itens = itens.map((it) =>
+      typeof it === 'string' ? JSON.parse(it) : it
+    );
+
+    const idx = itens.findIndex((i) => i.id == itemId);
+    if (idx < 0) {
+      return res.status(404).json({ error: 'Item não encontrado' });
+    }
+
+    // Aplica o patch localmente
+    itens[idx] = { ...itens[idx], ...patch };
+
+    // Constrói um literal de array de jsonb[] manualmente. Cada elemento
+    // precisa ser uma string JSON com aspas escapadas.
+    const arrLiteral =
+      '{' +
+      itens
+        .map((item) =>
+          '"' + JSON.stringify(item).replace(/"/g, '\\"') + '"'
+        )
+        .join(',') +
+      '}';
+
+    await sql`
+      UPDATE players
+      SET itens = ${arrLiteral}::jsonb[]
+      WHERE id = ${id}
+    `;
+
+    res.json(itens[idx]);
+  } catch (err) {
+    res.status(500).json({
+      error: 'Erro ao atualizar item',
+      details: err.message
+    });
+  }
+},
 
   async deleteItem(req, res) {
     // Remove um item específico do inventário.
