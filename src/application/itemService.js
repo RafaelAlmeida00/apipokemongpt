@@ -46,13 +46,13 @@ async function addItem(req, res) {
 
     // adiciona usando array_append e cast para jsonb
     await sql`
-      UPDATE players
-      SET itens = array_append(
-        COALESCE(itens, '{}'::jsonb[]),
-        ${JSON.stringify(newItem)}::jsonb
-      )
-      WHERE id = ${req.params.id}
-    `;
+  UPDATE players
+  SET itens = array_append(
+    COALESCE(itens, ARRAY[]::jsonb[]),
+    ${JSON.stringify(newItem)}::jsonb
+  )
+  WHERE id = ${req.params.id}
+`;
 
     res.status(201).json(newItem);
   } catch (err) {
