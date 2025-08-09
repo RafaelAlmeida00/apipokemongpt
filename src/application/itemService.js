@@ -21,34 +21,30 @@ export default {
   },
 
 async addItem(req, res) {
-  // Adiciona um item ao inventário.
-  // O corpo deve conter pelo menos `nome` e opcionalmente `quantidade` e `notas`.
-  // Um identificador único é gerado para permitir atualizações subsequentes.
-
   const { nome, quantidade = 1, notas } = req.body || {};
 
   if (!nome) {
     return res.status(400).json({ error: 'Nome do item é obrigatório' });
   }
 
-  // Garante que o objeto é JSON puro
-  const item = JSON.parse(JSON.stringify({
+  const item = {
     id: Date.now().toString(),
     nome,
     quantidade,
     notas
-  }));
+  };
 
   try {
     // Busca os itens existentes
     const result = await sql`
-      SELECT itens 
-      FROM players 
+      SELECT itens
+      FROM players
       WHERE id = ${req.params.id}
     `;
 
-    // Normaliza para array
     let itensFromDB = result[0]?.itens;
+
+    // Força para array
     if (!Array.isArray(itensFromDB)) {
       itensFromDB = itensFromDB ? [itensFromDB] : [];
     }
@@ -56,17 +52,15 @@ async addItem(req, res) {
     // Adiciona o novo item
     itensFromDB.push(item);
 
-    // Garante que todos os itens sejam JSONs puros antes de enviar
-    const itensSerializados = itensFromDB.map(i =>
-      sql.json(JSON.parse(JSON.stringify(i)))
-    );
+    // Serializa para JSON puro antes de enviar
+    const itensSerializados = itensFromDB.map(i => JSON.stringify(i));
 
-    // Atualiza no banco como jsonb[]
-    await sql`
-      UPDATE players 
-      SET itens = ${sql.array(itensSerializados, 'jsonb')} 
-      WHERE id = ${req.params.id}
-    `;
+    // Monta a query usando literal JSONB[]
+    await sql.unsafe(
+      `UPDATE players SET itens = ARRAY[${itensSerializados.map(() => `'{}'::jsonb`).join(',')}]::jsonb[] WHERE id = $1`,
+      [req.params.id],
+      itensSerializados
+    );
 
     res.status(201).json(item);
 
