@@ -47,10 +47,7 @@ async addItem(req, res) {
     // adiciona usando array_append e cast para jsonb
     await sql`
   UPDATE players
-  SET itens = array_append(
-    COALESCE(itens, ARRAY[]::jsonb[]),
-    ${JSON.stringify(newItem)}::jsonb
-  )
+  SET itens = COALESCE(itens, ARRAY[]::jsonb[]) || ARRAY[${sql.json(newItem)}]::jsonb[]
   WHERE id = ${req.params.id}
 `;
 
