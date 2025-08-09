@@ -74,52 +74,79 @@ export default {
     }
   },
 
-  async updatePlayer(req, res) {
-    // Atualiza campos simples (não relacionados a arrays jsonb[]) do player.
-    const { id } = req.params;
-    const updates = req.body;
-    // Campos que armazenam arrays jsonb[] e serão tratados por handlers específicos
-    const arrayFields = [
-      'eventos_iconicos',
-      'amigos',
-      'inimigos',
-      'rivais',
-      'interesses',
-      'conhecidos',
-      'insignias',
-      'torneios_participados',
-      'torneios_ganhos'
-    ];
-    try {
-      const keys = Object.keys(updates);
-      for (const key of keys) {
-        const value = updates[key];
-        // pular campos de arrays (eventos, relacionamentos etc.) aqui; eles são atualizados em endpoints próprios
-        if (arrayFields.includes(key)) {
-          continue;
-        }
-        if (value && typeof value === 'object') {
-          await sql`
-            UPDATE players
-            SET ${sql(key)} = ${sql.json(value)}
-            WHERE id = ${id}
-          `;
-        } else {
-          await sql`
-            UPDATE players
-            SET ${sql(key)} = ${value}
-            WHERE id = ${id}
-          `;
-        }
+ async updatePlayer(req, res) {
+  const { id } = req.params;
+
+  // Constrói o patch a partir da query string
+  // Reconhece campos simples e converte numéricos.
+  const patch = {};
+  [
+    'nome',
+    'aparencia',
+    'personalidade',
+    'idade',
+    'regiao',
+    'inicial',
+    'dinheiro',
+    'reputacao'
+  ].forEach((key) => {
+    if (req.query[key] !== undefined) {
+      let valor = req.query[key];
+      if (['idade', 'dinheiro', 'reputacao'].includes(key)) {
+        valor = Number(valor);
       }
-      res.status(200).json({ message: 'Jogador atualizado com sucesso' });
-    } catch (err) {
-      res.status(500).json({
-        error: 'Erro ao atualizar jogador',
-        details: err.message
-      });
+      patch[key] = valor;
     }
-  },
+  });
+
+  // O corpo JSON tem prioridade sobre a query
+  Object.assign(patch, req.body || {});
+
+  // Campos que armazenam arrays jsonb[] e têm handlers próprios
+  const arrayFields = [
+    'eventos_iconicos',
+    'amigos',
+    'inimigos',
+    'rivais',
+    'interesses',
+    'conhecidos',
+    'insignias',
+    'torneios_participados',
+    'torneios_ganhos'
+  ];
+
+  try {
+    const keys = Object.keys(patch);
+    for (const key of keys) {
+      // não mexe em campos tratados por endpoints específicos
+      if (arrayFields.includes(key)) {
+        continue;
+      }
+
+      const value = patch[key];
+      if (value && typeof value === 'object') {
+        // para objetos (como localizacao_atual) use json()
+        await sql`
+          UPDATE players
+          SET ${sql(key)} = ${sql.json(value)}
+          WHERE id = ${id}
+        `;
+      } else {
+        await sql`
+          UPDATE players
+          SET ${sql(key)} = ${value}
+          WHERE id = ${id}
+        `;
+      }
+    }
+    res.status(200).json({ message: 'Jogador atualizado com sucesso' });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Erro ao atualizar jogador',
+      details: err.message
+    });
+  }
+},
 
   // ---------- Eventos Icônicos ----------
   async addEvent(req, res) {
