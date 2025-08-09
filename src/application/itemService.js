@@ -50,17 +50,23 @@ async addItem(req, res) {
     // Adiciona o novo item
     itensFromDB.push(item);
 
-    // Salva como jsonb[]
+    // Salva no banco como jsonb[]
     await sql`
       UPDATE players
-      SET itens = ${sql.array(itensFromDB.map(i => sql.json(i)), 'jsonb')}
+      SET itens = ${sql.array(
+        itensFromDB.map(i => JSON.stringify(i)), // <-- converte cada item em string JSON
+        'jsonb'
+      )}
       WHERE id = ${req.params.id}
     `;
 
     res.status(201).json(item);
 
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao adicionar item', details: err.message });
+    res.status(500).json({
+      error: 'Erro ao adicionar item',
+      details: err.message
+    });
   }
 },
 
