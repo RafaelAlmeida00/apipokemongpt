@@ -35,7 +35,7 @@ async addItem(req, res) {
   };
 
   try {
-    // Busca os itens existentes
+    // Busca itens existentes
     const result = await sql`
       SELECT itens
       FROM players
@@ -43,8 +43,6 @@ async addItem(req, res) {
     `;
 
     let itensFromDB = result[0]?.itens;
-
-    // Força para array
     if (!Array.isArray(itensFromDB)) {
       itensFromDB = itensFromDB ? [itensFromDB] : [];
     }
@@ -52,15 +50,12 @@ async addItem(req, res) {
     // Adiciona o novo item
     itensFromDB.push(item);
 
-    // Serializa para JSON puro antes de enviar
-    const itensSerializados = itensFromDB.map(i => JSON.stringify(i));
-
-    // Monta a query usando literal JSONB[]
-    await sql.unsafe(
-      `UPDATE players SET itens = ARRAY[${itensSerializados.map(() => `'{}'::jsonb`).join(',')}]::jsonb[] WHERE id = $1`,
-      [req.params.id],
-      itensSerializados
-    );
+    // Salva como jsonb[]
+    await sql`
+      UPDATE players
+      SET itens = ${sql.array(itensFromDB.map(i => sql.json(i)), 'jsonb')}
+      WHERE id = ${req.params.id}
+    `;
 
     res.status(201).json(item);
 
