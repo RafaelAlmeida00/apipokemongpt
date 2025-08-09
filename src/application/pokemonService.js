@@ -213,7 +213,23 @@ export default {
   // Atualiza parcialmente os atributos de um Pokémon específico
   async updatePokemon(req, res) {
     const { id, pid } = req.params;
-    const patch = req.body || {};
+     // Constrói o patch a partir do corpo ou query. Se o mesmo campo
+  // existir em ambos, o valor de req.body prevalece.
+  const patch = {};
+
+// Copia chaves reconhecidas da query string.
+// Convertemos 'saude', 'nivel' e 'afinidade' para número.
+['nome', 'apelido', 'saude', 'nivel', 'afinidade'].forEach((key) => {
+  if (req.query[key] !== undefined) {
+    const valor = req.query[key];
+    patch[key] = ['saude', 'nivel', 'afinidade'].includes(key)
+      ? Number(valor)
+      : valor;
+  }
+});
+
+// Se vier um corpo JSON, ele tem prioridade sobre os valores da query.
+Object.assign(patch, req.body || {});
     try {
       const [player] = await sql`
         SELECT pokemons
